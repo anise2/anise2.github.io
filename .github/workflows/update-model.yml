@@ -1,0 +1,89 @@
+name: Train on Bangumi Archive and build site
+on:
+  schedule:
+    - cron: '30 0 1 1,4,7,10 *' # Quarterly: Jan/Apr/Jul/Oct 1, 08:30 Asia/Shanghai
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to GitHub Pages (enable Pages / GitHub Actions first)'
+        type: boolean
+        default: true
+permissions:
+  contents: read
+concurrency:
+  group: bangumi-model
+  cancel-in-progress: false
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write # Persist metadata-only snapshots from each quarterly update
+    env:
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install -r requirements.txt
+      - name: Download and normalize official archive (checks SHA-256 when supplied)
+        run: python -m pipeline.fetch --output .cache/latest.json
+      - uses: actions/cache@v4
+        with:
+          path: .cache/research
+          key: supplemental-metadata-v2-${{ github.run_id }}
+          restore-keys: supplemental-metadata-v2-
+      - name: Restore durable lookup checkpoint (survives cache eviction)
+        run: python -m pipeline.history evidence-restore
+      - name: Match archived disc sales and incrementally collect adaptation endpoints
+        run: python -m pipeline.enrich --max-lookups 160
+      - name: Update recent disc sales and cross-site metadata (bounded requests)
+        env:
+          MAL_CLIENT_ID: ${{ secrets.MAL_CLIENT_ID }}
+        run: python -m pipeline.supplement --max-lookups 60
+      - name: Preserve the quarterly update as an immutable metadata snapshot
+        run: python -m pipeline.history store
+      - name: Save incremental evidence lookup progress
+        run: python -m pipeline.history evidence-store
+      - name: Restore annual historical cohorts
+        run: python -m pipeline.history restore
+      - name: Test leakage controls, labels and OVA accounting
+        run: python -m unittest discover -s tests -v
+      - name: Train selected CPU survival model (latest cutoff only)
+        run: python -m pipeline.train
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: static-site-and-model-report
+          path: |
+            dist/
+            artifacts/
+            data/external/enrichment.json
+          retention-days: 30
+      - uses: actions/upload-pages-artifact@v4
+        if: github.event_name == 'schedule' || inputs.publish == true || vars.ENABLE_PAGES == 'true'
+        with:
+          path: dist
+  deploy:
+    if: github.event_name == 'schedule' || inputs.publish == true || vars.ENABLE_PAGES == 'true'
+    needs: train
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Deploy static site
+        id: deployment
+        uses: actions/deploy-pages@v4

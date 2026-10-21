@@ -1,0 +1,17 @@
+.venv/
+node_modules/
+dist/
+.cache/
+artifacts/
+__pycache__/
+*.pyc
+.taste-skill/
+.vscode/
+test-results/
+
+# Split static artifacts are rebuilt from the catalog.
+data/bootstrap.json
+data/library.json
+data/analysis.json
+data/backtest-report.json
+data/details/

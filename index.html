@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fbf9fa">
+  <meta name="description" content="用 Bangumi 数据与可解释机器学习，观察动画下一季的可能性。系列封面、季度进度、标签影响与时间回测。">
+  <meta name="referrer" content="no-referrer">
+  <title>续作观测室 · AnimeSeason2Predictor</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://lain.bgm.tv">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="assets/app-base.css">
+  <link rel="stylesheet" href="assets/style.css">
+  <script src="assets/charts.js" defer></script>
+  <script src="assets/app.js" type="module"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <header class="mobile-header"><a href="#library" class="mobile-brand">つづく。<span>续作观测室</span></a><button id="menu-toggle" class="icon-button" aria-label="打开导航" aria-expanded="false"></button></header>
+  <aside class="site-sidebar" aria-label="主导航">
+    <a class="brand" href="#library" aria-label="续作观测室首页"><span class="brand-mark">つづく<span>。</span></span><strong>续作观测室</strong><span class="brand-caption">AnimeSeason2Predictor</span></a>
+    <div class="sidebar-caption">追完了，然后呢？</div>
+    <nav id="navigation">
+      <a href="#library" data-view="library"><span data-icon="library"></span>续作片单</a>
+      <a href="#features" data-view="features"><span data-icon="chart"></span>特征实验室</a>
+      <a href="#backtest" data-view="backtest"><span data-icon="history"></span>时间回测</a>
+      <a href="#watchlist" data-view="watchlist"><span data-icon="bookmark"></span>我的关注</a>
+    </nav>
+    <div class="sidebar-model"><span class="live-dot"></span><span>长期续作预测</span><div id="model-summary">正在读取模型资料</div><a href="#about">了解预测方法 <span data-icon="arrow"></span></a></div>
+    <div class="sidebar-bottom"><a href="https://github.com/bangumi/Archive" target="_blank" rel="noreferrer"><span data-icon="database"></span>Bangumi 数据归档 <span data-icon="external"></span></a><a href="#about"><span data-icon="info"></span>关于这个项目</a><p>给等待下一季的你。<br><span>数据是线索，故事仍在继续。</span></p></div>
+  </aside>
+  <main id="main" tabindex="-1">
+    <div class="topline"><span>动画研究 / <span id="current-section">续作片单</span></span><span id="data-stamp">读取 Bangumi 快照中</span></div>
+    <div id="app"><div class="initial-state"><h1>续作片单</h1><p class="loading-line" role="status"><span class="loading-spinner" aria-hidden="true"></span>正在载入片单，封面稍后显示…</p><div class="skeleton-grid"><div></div><div></div></div></div></div>
+    <footer class="page-footer"><span>つづく。故事的下一页，留给时间。</span><a href="https://bgm.tv" target="_blank" rel="noreferrer">数据来自 Bangumi</a><span>预测不等于制作消息</span></footer>
+  </main>
+  <dialog id="detail-dialog" aria-labelledby="detail-title"><div id="detail-content"></div></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

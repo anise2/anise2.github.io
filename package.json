@@ -1,0 +1,16 @@
+{
+  "name": "anime-season2-predictor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "python3 -m http.server 5173 --bind 0.0.0.0",
+    "build": "node scripts/build.mjs",
+    "test": "python3 -m unittest discover -s tests -v",
+    "test:browser": "node scripts/browser-test.mjs && node scripts/loading-test.mjs",
+    "predev": "node scripts/build.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.0"
+  }
+}
