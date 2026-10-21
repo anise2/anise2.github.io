@@ -1,7 +1,7 @@
 import tempfile
 import math
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from datetime import date
 from pathlib import Path
 
@@ -9,7 +9,7 @@ import numpy as np
 from pipeline.common import (duration_minutes, enrichment_at, features, is_tv, normalize_subject, read_enrichment,
     relation_graph, season_progress, sequels_of, series_members, normalize_book, original_for, completion_evidence, infobox_value)
 from pipeline.train import choose_split, explain, fit, prospective_rows, retrospective_rows
-from pipeline.enrich import parse_endpoint, MetadataReader, validate_raw_sales
+from pipeline.enrich import parse_endpoint, MetadataReader, validate_raw_sales, adaptation_priority, import_adaptations
 
 
 def subject(sid, aired='2023-06-01', platform='TV', **kwargs):
@@ -237,6 +237,48 @@ class NormalizeTests(unittest.TestCase):
 
 
 class CheckpointTests(unittest.TestCase):
+    def test_adaptation_queue_prioritizes_new_then_oldest_expired(self):
+        from pipeline.common import write_json
+        with tempfile.TemporaryDirectory() as directory:
+            cache=Path(directory)
+            records=[(1,1,None),(2,10000,'2026-09-06'),(3,100,'2026-08-01'),
+                     (4,20000,'2026-09-20'),(5,2,'invalid')]
+            items=[]
+            for sid,votes,observed in records:
+                items.append((subject(sid,votes=votes),{'id':sid},1))
+                if observed:
+                    write_json(cache/'mangaupdates'/f'{sid}.json',
+                        {'matching_version':2,'observed_at':observed,'record':None})
+            ordered=sorted(items,key=lambda item:adaptation_priority(item,cache,date(2026,10,21)))
+            self.assertEqual([item[0]['id'] for item in ordered],[5,1,3,2,4])
+            # Exactly 45 days expires; a 31-day-old successful no-match remains cached.
+            self.assertEqual(adaptation_priority(items[1],cache,date(2026,10,21))[0],1)
+            self.assertEqual(adaptation_priority(items[3],cache,date(2026,10,21))[0],2)
+
+    def test_lookup_budget_expands_coverage_and_still_reads_fresh_evidence(self):
+        from pipeline.common import write_json,load_snapshot
+        with tempfile.TemporaryDirectory() as directory:
+            cache=Path(directory);items=[]
+            for sid,votes in [(1,1),(2,10000),(3,100)]:
+                book={'id':sid+100,'name':f'原作{sid}','name_cn':'','kind':'漫画',
+                      'status':'ongoing','volumes':10}
+                items.append(subject(sid,votes=votes,originals=[book]))
+            for oid,observed in [(102,'2026-08-01'),(103,'2026-09-20')]:
+                write_json(cache/'mangaupdates'/f'{oid}.json',{'matching_version':2,
+                    'observed_at':observed,'record':{'url':'https://example.com/source','status':'Ongoing',
+                        'anime':{'end':'Vol 4'}}})
+            client=Mock();client.post.return_value.json.return_value={'results':[]}
+            output={}
+            with patch('pipeline.enrich.date') as today,patch('pipeline.enrich.time.sleep'):
+                today.today.return_value=date(2026,10,21)
+                result=import_adaptations(snapshot(items,at='2026-10-21'),client,cache,output,1)
+            self.assertEqual(result,{'requests':1,'notes':1,'numeric':1})
+            self.assertEqual(client.post.call_args.kwargs['json']['search'],'原作1')
+            self.assertIsNone(load_snapshot(cache/'mangaupdates'/'101.json')['record'])
+            self.assertEqual(output['3']['adaptation_evidence']['adaptation_endpoint'],4)
+            self.assertEqual(output['3']['adaptation_evidence']['observed_at'],'2026-09-20')
+            self.assertEqual(load_snapshot(cache/'mangaupdates'/'102.json')['observed_at'],'2026-08-01')
+
     def test_truncated_upstream_sales_cannot_enter_the_model(self):
         raw=[{'title':'Hyouka','avg_sales':'10,046'},{'title':'Shigatsu wa Kimi no Uso','avg_sales':'10,727'},
              {'title':'Bakemonogatari','avg_sales':'79,201'}]

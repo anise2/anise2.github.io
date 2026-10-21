@@ -1,7 +1,7 @@
 name: Train on Bangumi Archive and build site
 on:
   schedule:
-    - cron: '30 0 1 1,4,7,10 *' # Quarterly: Jan/Apr/Jul/Oct 1, 08:30 Asia/Shanghai
+    - cron: '30 0 1 * *' # Monthly: day 1, 08:30 Asia/Shanghai
   workflow_dispatch:
     inputs:
       publish:
@@ -18,10 +18,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
-      contents: write # Persist metadata-only snapshots from each quarterly update
+      contents: write # Persist metadata-only snapshots from each monthly update
     env:
       OMP_NUM_THREADS: '2'
-      OPENBLAS_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '1'
+      PYTHONFAULTHANDLER: '1'
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -48,7 +49,7 @@ jobs:
         env:
           MAL_CLIENT_ID: ${{ secrets.MAL_CLIENT_ID }}
         run: python -m pipeline.supplement --max-lookups 60
-      - name: Preserve the quarterly update as an immutable metadata snapshot
+      - name: Preserve the monthly update as an immutable metadata snapshot
         run: python -m pipeline.history store
       - name: Save incremental evidence lookup progress
         run: python -m pipeline.history evidence-store

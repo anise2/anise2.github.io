@@ -314,7 +314,7 @@ function about() {
   <h2>季度与附属作品分别统计</h2><p>TV / WEB 正篇每季计 1；每集至少 21 分钟的已播 OVA 计 0.1。详情右上角另列剧场版、总集篇与普通番外数量。历史模型只使用有逐集日期的 OVA；无日期的汇总集数不提前回填。原作完结不等于动画完结，下拉菜单中的已完结状态仍须有明确证据。</p>
   <h2>销量可以继续更新</h2><p>旧数据来自 <a href="https://github.com/zhouandrewc/anime-sales-prediction" target="_blank" rel="noreferrer">Anime Sales Predictions 的固定 2020 年快照</a>，其来源为 Someanithing。现在新增 <a href="https://www.lanovelibrary.com/2025-hegemony-anime-ranking/" target="_blank" rel="noreferrer">ラノベライブラリ年度销量汇总</a>，采集 2021 年起各年列表，按标题与首播年唯一匹配。新来源为非官方 BD + DVD 已知卷累平，不把未知卷当零，排除再版；与首卷首周以及旧来源口径分开。缺失或匹配有歧义的记录不填数。</p>
   <h2>MyAnimeList 与更多来源</h2><p><a href="https://myanimelist.net/apiconfig/references/api/v2" target="_blank" rel="noreferrer">MyAnimeList 官方 API v2</a>支持作品资料、评分统计、类型与制作公司；公共读取需要应用 Client ID。后台支持 MAL_CLIENT_ID，并可尝试有限速的 Jikan 非官方接口；凭据不会放进网页。跨站 ID、封面地址、标签与制作信息还可从 <a href="https://github.com/manami-project/anime-offline-database" target="_blank" rel="noreferrer">anime-offline-database</a> 精确关联；该归档最后更新为 2026-07-04，不能当作持续更新的 MAL 实时数据。</p><p>原作通过 Bangumi 跨媒体关系关联，改编终点来自 MangaUpdates。每条外部记录保留来源和取得日期。任何缺少时点依据的新特征都先保存资料，不混入旧回测。</p>
-  <h2>更新与页面加载</h2><p>GitHub Actions 每三个月更新一次：1、4、7、10 月 1 日北京时间 08:30 下载最新归档、分批补充资料、训练当前模型并输出静态页面；完整逐年重训只在本地运行。首页先读取精简片单，后台加载完整筛选索引；回测、作品详情和完整报告按需读取。封面全部远端外链，最多 3 个并发，先完成已展示作品的全部首图，再自动加载背面封面，本站不缓存图片。</p>
+  <h2>更新与页面加载</h2><p>GitHub Actions 每月更新一次：每月 1 日北京时间 08:30 下载最新归档、分批补充资料、训练当前模型并输出静态页面；完整逐年重训只在本地运行。首页先读取精简片单，后台加载完整筛选索引；回测、作品详情和完整报告按需读取。封面全部远端外链，最多 3 个并发，先完成已展示作品的全部首图，再自动加载背面封面，本站不缓存图片。</p>
   </section></div>`;
 }
 

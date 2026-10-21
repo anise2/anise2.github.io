@@ -96,7 +96,9 @@ def fit_fractional(config,X,w,trees):
     # oversampling prior shift: total weight of every season stays exactly one.
     x=np.concatenate([X,X]);y=np.r_[np.ones(len(X)),np.zeros(len(X))];weight=np.r_[w,1-w]
     mask=weight>1e-8;m=make_estimator(config,trees)
-    with threadpool_limits(limits=4):
+    # SciPy's bundled OpenBLAS can crash in L-BFGS when its pool is raised
+    # above OPENBLAS_NUM_THREADS at runtime. Keep BLAS serial; trees use OpenMP.
+    with threadpool_limits(limits={'blas':1,'openmp':4}):
         if config['kind']=='logistic':m.fit(x[mask],y[mask],logisticregression__sample_weight=weight[mask])
         else:m.fit(x[mask],y[mask],sample_weight=weight[mask])
     return m
@@ -113,7 +115,7 @@ class CureModel:
 
     def baseline(self,X):
         z=X.copy();z[:,self.age_col]=0
-        with threadpool_limits(limits=4):p=self.model.predict_proba(z)[:,1]
+        with threadpool_limits(limits={'blas':1,'openmp':4}):p=self.model.predict_proba(z)[:,1]
         return np.clip(p,1e-5,1-1e-5)
 
     def survival(self,t):return lognorm.sf(np.maximum(t,1e-8),s=self.sigma,scale=np.exp(self.mu))
@@ -161,7 +163,7 @@ def _fit_cure_matrix(rows,config,X,age_col,trees,iterations):
     model=None
     for step in range(iterations):
         model=fit_fractional(config,X,w,trees)
-        with threadpool_limits(limits=4):pi=np.clip(model.predict_proba(X)[:,1],1e-5,1-1e-5)
+        with threadpool_limits(limits={'blas':1,'openmp':4}):pi=np.clip(model.predict_proba(X)[:,1],1e-5,1-1e-5)
         def loss(theta):
             location,ls=theta;scale=np.exp(ls)
             return -np.mean(event*(np.log(pi)+lognorm.logpdf(t,s=scale,scale=np.exp(location)))+
@@ -245,6 +247,7 @@ def select_model(snapshot,cutoff,enrichment,trees=120):
         raise ValueError('Insufficient historical evidence for nested selection')
     results=[];best=None
     for config in CANDIDATES:
+        print(f"Validate {config['id']} at {valid_cutoff}: {len(inner)} training seasons",flush=True)
         m,v=fit_cure(inner,config,trees)
         at_origin={r['id']:r for r in train_rows}
         after=m.nll(v.transform([r['features'] for r in valid]),valid)

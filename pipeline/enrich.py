@@ -23,6 +23,7 @@ SALES_RAW_REV = 'b729e3979de09c5e11c6edd1bdcd10216e2fef73'
 SALES_REPO = 'https://github.com/zhouandrewc/anime-sales-prediction'
 SALES_URL = SALES_REPO + '/blob/' + SALES_RAW_REV + '/data/clean_anime_sales.pickle'
 CROSSWALK_URL = 'https://github.com/manami-project/anime-offline-database/releases/download/2026-27/anime-offline-database-minified.json.zst'
+ADAPTATION_CACHE_DAYS = 45
 
 
 def key(value):
@@ -154,6 +155,19 @@ def parse_endpoint(record,original,season_count):
     return {}
 
 
+def adaptation_priority(item,cache,today):
+    subject,original,_=item
+    path=cache/'mangaupdates'/f'{original["id"]}.json'
+    cached=load_snapshot(path) if path.exists() else {}
+    observed=parse_date(cached.get('observed_at'))
+    valid=cached.get('matching_version')==2 and observed is not None
+    # Unqueried originals must not starve behind popular but expired entries.
+    # Fresh results are still consumed below even after the request budget ends.
+    phase=0 if not valid else 2 if (today-observed).days<ADAPTATION_CACHE_DAYS else 1
+    oldest=observed.isoformat() if phase==1 else ''
+    return phase,oldest,-subject.get('votes',0),original['id']
+
+
 def import_adaptations(snapshot,client,cache,output,max_lookups):
     subjects,_,_,groups=relation_graph(snapshot)
     grouped=series_members(snapshot,subjects,groups)
@@ -165,13 +179,14 @@ def import_adaptations(snapshot,client,cache,output,max_lookups):
         latest=max(aired,key=lambda s:(s['date'],s['id']))
         original=original_for(latest,members)
         if original:selected.append((latest,original,season_progress(members,cutoff)['regular']))
-    selected.sort(key=lambda x:x[0].get('votes',0),reverse=True)
+    selected.sort(key=lambda item:adaptation_priority(item,cache,date.today()))
     used,matched,notes=0,0,0
     for s,original,seasons in selected:
         path=cache/'mangaupdates'/f'{original["id"]}.json'
-        if path.exists() and load_snapshot(path).get('matching_version') == 2 and (date.today()-parse_date(load_snapshot(path)['observed_at'])).days < 30:
-            cached=load_snapshot(path)
-        elif used < max_lookups:
+        cached=load_snapshot(path) if path.exists() else {}
+        observed=parse_date(cached.get('observed_at'))
+        fresh=cached.get('matching_version')==2 and observed is not None and (date.today()-observed).days<ADAPTATION_CACHE_DAYS
+        if not fresh and used < max_lookups:
             used+=1
             try:
                 r=client.post('https://api.mangaupdates.com/v1/series/search',json={'search':original['name'],'per_page':10},timeout=25)
@@ -197,7 +212,7 @@ def import_adaptations(snapshot,client,cache,output,max_lookups):
                 print(f'MangaUpdates lookup skipped #{original["id"]}: {type(error).__name__}',flush=True)
                 continue
             if used%20==0:print(f'MangaUpdates requests {used}/{max_lookups}; matched progress notes {notes}.',flush=True)
-        else:continue
+        elif not fresh:continue
         record=cached['record']
         if not record:continue
         anime=record.get('anime') or {}
