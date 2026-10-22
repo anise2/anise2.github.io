@@ -6,6 +6,7 @@ const icons = {
   history: '<path d="M3 11a9 9 0 1 1 2.7 7M3 4v7h7M12 7v5l3 2"/>',
   bookmark: '<path d="M6 4h12v17l-6-4-6 4z"/>',
   database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/>',
+  code: '<path d="m8 6-6 6 6 6m8-12 6 6-6 6m-3-15-2 18"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>',
   search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
   arrow: '<path d="M4 12h16m-6-6 6 6-6 6"/>',
@@ -72,11 +73,11 @@ document.querySelector('#menu-toggle').addEventListener('click', e => {
   e.currentTarget.setAttribute('aria-label', open ? '关闭导航' : '打开导航');
 });
 
-function notice() {
+function notice(showLink = state.view !== 'about') {
   const sample = data.mode === 'api_sample';
   const strict = data.validation === 'temporal_release_events';
-  const message = sample ? `联调预览：${num(data.coverage.anime_records)} 条 Bangumi 数据；当前特征回看历史，非严格回测。` : strict ? '发行事件与动态证据按时间截断；原作类型等固定属性由当前归档重建。' : `2006–${data.snapshot_at.slice(0,4)} 全量归档 · ${num(data.coverage.records_since_2006)} 条动画记录。当前标签与原作资料回看历史，仍属探索回测。`;
-  return `<div class="notice"><div>${icon('info')}<span>${message}</span></div><a href="#about">数据说明 ${icon('arrow')}</a></div>`;
+  const message = sample ? `联调预览：${num(data.coverage.anime_records)} 条 Bangumi 数据；当前特征回看历史，非严格回测。` : strict ? '发行事件截断回测：历史特征按首播时点筛选，等待时长计算到预测截点；原作类型与制作公司等固有属性取自最新归档。' : `2006–${data.snapshot_at.slice(0,4)} 全量归档 · ${num(data.coverage.records_since_2006)} 条动画记录。当前标签与原作资料回看历史，仍属探索回测。`;
+  return `<div class="notice"><div>${icon('info')}<span>${message}</span></div>${showLink ? `<a href="#about">数据说明 ${icon('arrow')}</a>` : ''}</div>`;
 }
 
 function heading(title, sub, action = '') {
@@ -305,16 +306,60 @@ function drawSeason() {
 }
 
 function about() {
-  const policy=data.temporal_policy;
-  app.innerHTML=heading('把方法与边界，摊开来说。','数据来源、时间约束与可复现的训练。')+notice()+`<div class="about-layout"><section class="panel prose">
-  <h2>预测的是将来是否还会有下一季</h2><p>目标不限定未来一年；每个系列的当前最新正篇都可预测后续一季。已知下一季与有证据的完结状态另行展示。首页默认“还没有续作”，只看首播至少一年前的作品，按长期续作概率排序。概率区间默认 0–100%。四个入口恢复固定的整套筛选：清空搜索、标签、原作与日期限制；高概率设为全部状态、30–100% 和社区评分优先，没有续作设为对应状态、0–100% 和概率优先。搜索、标签及其他筛选会保存在地址栏，可直接分享。</p>
-  <h2>严格截断了什么？</h2><p>训练、模型选择、阈值选择只能看到年度截点及以前的结果；下一年仅用于最终验收。系列特征只由当前季首播前已经发行的节点重建，未来作品不能连接历史系列。使用随机森林、极端随机树、梯度提升和逻辑回归的 6 个配置，分别搭配精简和完整特征，共比较 12 组，依据更早起点之后的条件删失损失选模型。阈值使用截点之前两个完整年度的 F2，每次拟合都仅依据训练集删除常量和零贡献字段，重新训练直到保留项稳定；等待天数通过生存公式单独使用。</p><p>评分、收藏、题材评价标签、原作卷数与完结状态没有历史快照，已从模型移除。原作类型和动画制作署名作为固定作品属性单独编码，原作发行年龄与公司历史产量只使用首播前的发行日期。今天新采集的销量、MAL 和改编进度保存实际采集日，不按作品首播日倒填。页面仍展示这些参考资料，显示它们并不表示参与了训练。</p><p><strong>这不是完整历史快照回测。</strong>${esc(policy?.limitations || '基础发行事实来自当前归档。')} 现有数据无法恢复二十年来每个字段的历史版本。CI 会继续保存真实快照，供后续验证使用。</p>
-  ${data.model.optimization?`<h2>剔除无贡献输入后的回测</h2><p>${data.model.optimization.cutoff_range} 年的 ${data.model.optimization.years} 个截点中，年度平均 PR-AUC 从 ${data.model.optimization.before.macro_pr_auc.toFixed(3)} 变为 ${data.model.optimization.after.macro_pr_auc.toFixed(3)}，召回率从 ${pct(data.model.optimization.before.recall)} 变为 ${pct(data.model.optimization.after.recall)}，当年续作比例从 ${pct(data.model.optimization.before.precision)} 变为 ${pct(data.model.optimization.after.precision)}。这些是严格截点下的年度检索指标，不是长期概率准确率。每年均独立训练和筛选，没有依据验收年份选择字段。</p><p>当前模型保留 ${num(data.model.features)} 项输入；其中等待天数用于生存公式，其余字段均有非零模型权重。特征越少不等于准确率必然提高，完整逐年结果在时间回测中展示。</p>`:''}
-  <h2>年度指标如何理解？</h2><p>每个年度验收覆盖截点以前的所有系列；当年正好有续作的为当年正例。“当年续作召回率”看这些续作找回了多少；“当年续作比例”看候选名单里当年出续作的占比。没有在当年续作不代表永不续作，因此不报告长期分类准确率。片单使用混合生存模型的长期条件概率，依赖等待时间分布假设，尚未声称校准。</p>
-  <h2>季度与附属作品分别统计</h2><p>TV / WEB 正篇每季计 1；每集至少 21 分钟的已播 OVA 计 0.1。详情右上角另列剧场版、总集篇与普通番外数量。历史模型只使用有逐集日期的 OVA；无日期的汇总集数不提前回填。原作完结不等于动画完结，下拉菜单中的已完结状态仍须有明确证据。</p>
-  <h2>销量可以继续更新</h2><p>旧数据来自 <a href="https://github.com/zhouandrewc/anime-sales-prediction" target="_blank" rel="noreferrer">Anime Sales Predictions 的固定 2020 年快照</a>，其来源为 Someanithing。现在新增 <a href="https://www.lanovelibrary.com/2025-hegemony-anime-ranking/" target="_blank" rel="noreferrer">ラノベライブラリ年度销量汇总</a>，采集 2021 年起各年列表，按标题与首播年唯一匹配。新来源为非官方 BD + DVD 已知卷累平，不把未知卷当零，排除再版；与首卷首周以及旧来源口径分开。缺失或匹配有歧义的记录不填数。</p>
-  <h2>MyAnimeList 与更多来源</h2><p><a href="https://myanimelist.net/apiconfig/references/api/v2" target="_blank" rel="noreferrer">MyAnimeList 官方 API v2</a>支持作品资料、评分统计、类型与制作公司；公共读取需要应用 Client ID。后台支持 MAL_CLIENT_ID，并可尝试有限速的 Jikan 非官方接口；凭据不会放进网页。跨站 ID、封面地址、标签与制作信息还可从 <a href="https://github.com/manami-project/anime-offline-database" target="_blank" rel="noreferrer">anime-offline-database</a> 精确关联；该归档最后更新为 2026-07-04，不能当作持续更新的 MAL 实时数据。</p><p>原作通过 Bangumi 跨媒体关系关联，改编终点来自 MangaUpdates。每条外部记录保留来源和取得日期。任何缺少时点依据的新特征都先保存资料，不混入旧回测。</p>
-  <h2>更新与页面加载</h2><p>GitHub Actions 每月更新一次：每月 1 日北京时间 08:30 下载最新归档、分批补充资料、训练当前模型并输出静态页面；完整逐年重训只在本地运行。首页先读取精简片单，后台加载完整筛选索引；回测、作品详情和完整报告按需读取。封面全部远端外链，最多 3 个并发，先完成已展示作品的全部首图，再自动加载背面封面，本站不缓存图片。</p>
+  const policy = data.temporal_policy;
+  app.innerHTML = heading('把方法与边界，摊开来说。', '关于这个项目：数据从何而来、如何推算、以及我们如何守住时间底线。') + `<div class="about-layout"><section class="panel prose">
+  <h2>写在前面：追完一部番，然后呢？</h2>
+  <p>当屏幕上打出“おわり”或片尾曲缓缓落下时，很多观众心中都会升起同一个念头：“这部作品，还会有下一季吗？”</p>
+  <p>有的人在默默等待官方发布会，有的人在论坛和社交媒体里凭借零散的碟片销量与话题热度各执一词。<strong>续作观测室（anise2）</strong>正是一个尝试回答这个问题的公开实验：我们基于过去二十年、数千部日本动画的真实演变历史，通过可解释的机器学习与生存分析，去梳理那些藏在数据里的线索，推算一个系列在未来迎来新一季的概率。</p>
+
+  <h2>我们究竟在预测什么？</h2>
+  <p>这里的预测目标，<strong>并不是猜“明年会不会出第二季”</strong>。现实中，一部动画续作的企划、筹备与制作周期往往长达两到三年，甚至有些作品在沉寂七八年乃至更久后才突然“文艺复兴”。</p>
+  <p>因此，本模型的定义是：<strong>在该系列截至预测时仍未开播下一季的条件下，在未来的任何时候，是否还会推出下一季正式的 TV / WEB 动画</strong>。我们把续作视作一个“等待事件”，采用<strong>混合生存模型（Mixture Cure Model）</strong>来推算：</p>
+  <ul>
+    <li><strong>作品资质（发生率模型）</strong>：结合原作类型、历史季数、制作公司过往履历等被保留的特征，评估该作品是否有孕育续作的底色。前作销量仅在具备合格历史记录且被模型保留时使用。</li>
+    <li><strong>等待时长（生存时间分布）</strong>：随着最新一季首播后的岁月逐渐拉长，模型在每次数据更新时重新计算后续迎来下一季的条件概率。“暂时没有续作”绝不等于“永远不会出”，可能性在模型假设下随着等待时长平滑演化。</li>
+  </ul>
+
+  <h2>核心防线：如何严格“防穿越”？</h2>
+  <p>在机器学习中，最容易让人盲目乐观的陷阱就是<strong>“数据泄露”（俗称偷看剧本、时空穿越）</strong>。举个例子：如果我们回测 2012 年的一部动画，却在特征里喂给了它 2024 年的 Bangumi 评分、后来的原作总发行卷数、或者多年后才发售的 OVA，那么模型给出的高命中率就毫无参考价值，纯属“事后诸葛亮”。</p>
+  <p>为了杜绝这类失真，本项目确立了极其克制的时间边界：</p>
+  <ul>
+    <li><strong>历史特征，按首播时点截断</strong>：回测时，模型只使用该季首播时已发生的事实（例如已播正篇数、历史续作间隔、首播前已有观测记录的前作碟片销量等）。后续发行事件和后来采集的销量，不向历史输入倒填；等待天数则计算到预测截点。</li>
+    <li><strong>作品的固有属性，基于当前最新归档补齐</strong>：一部动画是漫画改、小说改还是原创？承制的动画公司是哪一家？模型假定这些属性在首播时已经确定。由于公开数据库并未保存二十年间每一个字段的历史修改日志，我们统一采用当前归档中的明确分类与署名。</li>
+    <li><strong>剔除无法追溯历史快照的后验字段</strong>：Bangumi / MyAnimeList 社区评分与收藏人数、用户自定义评价标签、原作连载完结状态等，因缺乏精确的历史时间截点，已全数从模型训练特征中剔除。</li>
+  </ul>
+  <p><strong>客观边界说明</strong>：${esc(policy?.limitations || '这是基于历史发行事件严格截断的探索性回测，而不是完整复原了二十年前数据库每一时刻状态的时空快照。')}现有公开数据无法还原二十年前数据库每时每刻的原始快照。我们无法验证模型是否赶在官方当年发表推文之前预测到了续作，也不能排除当前归档重建历史带来的全部偏差。</p>
+
+  ${data.model.optimization ? `<h2>剔除噪声：精简特征后的回测表现</h2>
+  <p>特征越多越好吗？实测并非如此。在过去的 ${data.model.optimization.years} 个年度历史截点（${data.model.optimization.cutoff_range}）中，我们分别依据各截点的训练数据进行了零贡献字段清理。以这次精简实验的主模型为例：从原本庞杂的 ${num(data.model.optimization.inputs_before)} 项输入中，剔除了 ${num(data.model.optimization.zero_removed)} 项训练分裂增益为零的字段，保留了 ${num(data.model.optimization.inputs_after)} 项输入，其中等待天数由生存公式单独使用。</p>
+  <p>清理并重新训练后，年度平均检索 PR-AUC 达到 <strong>${data.model.optimization.after.macro_pr_auc.toFixed(3)}</strong>，当年续作召回率保持在 <strong>${pct(data.model.optimization.after.recall)}</strong>（找回 ${data.model.optimization.after.confusion[1][1]} / ${data.model.optimization.after.positive_n} 次年度续作），入选名单的当年续作比例为 <strong>${pct(data.model.optimization.after.precision)}</strong>。这些结果说明本次精简没有降低上述年度回测指标，但不能据此证明模型不存在过拟合。</p>` : ''}
+
+  <h2>指标怎么看？为什么不提“分类准确率”？</h2>
+  <p>如果一个模型对所有动画都回答“这一年没有下一季”，它的表面“准确率”也会很高，因为一年内没有续作的样本占多数——但它找不回任何正例。至于长期是否会续作，尚未续作的作品仍在等待，不能当成永久负例计算准确率。因此，我们更关注模型在各个历史年度中的<strong>找回能力（Recall）</strong>与<strong>排序质量（PR-AUC）</strong>：</p>
+  <ul>
+    <li><strong>当年续作召回率（约 60%）</strong>：在 2010–2024 年这 15 个截点的回测中，下一年实际开播续作的作品，有约六成在年度截点时进入了模型划定的关注圈；这不代表早于官方宣布。</li>
+    <li><strong>当年续作比例（约 16%）</strong>：在这组历史回测中，进入关注圈的作品有约 16% 在对应的下一年迎来续作；不能仅凭其余作品当年未续作，就判定长期预测失败，仍需继续观察。关注圈采用历史验证选出的阈值，与首页的概率筛选预设不同。</li>
+    <li><strong>片单中的长期概率</strong>：展示的是混合生存模型给出的长期可能性估计，依赖等待时间分布假设，尚未校准，供片单排序与纵向对比参考。</li>
+  </ul>
+
+  <h2>季度划分与统计口径</h2>
+  <p>TV 与 WEB 形式的正式正篇每季计 1；每集时长至少 21 分钟的已播 OVA，按每集 0.1 季计进度。剧场版、总集篇与普通番外在详情中单独列出，不混入正篇季数；符合上述条件的随书 OVA 也按 OVA 计。历史模型仅计入有逐集播出日期的 OVA。</p>
+  <p>需要强调的是，<strong>“原作已完结”并不自动等同于“动画已完结”</strong>。许多原作即便完结，动画改编仍有继续推进或重置的空间；反之，原创动画也有可能一季完满收官。“系列已完结”依据明确的系列标签、改编资料或终章已播完等规则判断，详情会列出依据，但不等同于官方确认。</p>
+
+  <h2>数据来源与致谢</h2>
+  <ul>
+    <li><strong><a href="https://github.com/bangumi/Archive" target="_blank" rel="noreferrer">Bangumi 数据归档</a></strong>：本项目的核心基石，提供 Bangumi 收录的动画条目、时间轴、系列派生关系与制作团队信息；本项目关注 2006 年至今的日本动画。</li>
+    <li><strong><a href="https://github.com/zhouandrewc/anime-sales-prediction" target="_blank" rel="noreferrer">Someanithing / Andrew Zhou 销量快照</a></strong>：提供 2020 年以前经典日本动画的 BD+DVD 碟片销量历史参考。</li>
+    <li><strong><a href="https://www.lanovelibrary.com/2025-hegemony-anime-ranking/" target="_blank" rel="noreferrer">ラノベライブラリ 年度销量汇总</a></strong>：提供 2021 年至今的新番非官方销量累平数据，采用严格单作品对应与已知卷累平口径，不倒填、不把未知卷当零。</li>
+    <li><strong><a href="https://www.mangaupdates.com/" target="_blank" rel="noreferrer">MangaUpdates</a></strong>：核对漫改/小说改动画对应的改编终点与连载进度，按实际采集日期保存，不视作首播时已知的资料。</li>
+    <li><strong><a href="https://github.com/manami-project/anime-offline-database" target="_blank" rel="noreferrer">anime-offline-database</a> & MyAnimeList</strong>：提供跨站作品 ID 匹配、外链跳转与多维度海报封面参考。</li>
+  </ul>
+
+  <h2>自动化流程与开源</h2>
+  <p>本项目通过 GitHub Actions 实现每月全自动更新：每月 1 日上午定时同步最新公开数据归档、增量核验商业与改编资料、触发模型重训并打包发布静态网页。</p>
+  <p>全站采用轻量静态设计，所有数据和图片均不依赖私有服务后端，尊重用户隐私，关注清单仅存储在您的本地浏览器中。</p>
+  <p>如果你发现了数据关联疏漏、有更准确的改编终点或完结线索，或对模型与界面有任何改进想法，非常欢迎在 <a href="https://github.com/anise2/anise2.github.io" target="_blank" rel="noreferrer">GitHub 仓库 ${icon('external')}</a> 提出建议、反馈问题或参与贡献！</p>
+  <p>数据是理性的线索，但每一部动画续作的诞生，背后都凝结着创作者、制作团队、投资委员会与无数热切观众的心血与机缘。愿每一份等待，都能在未来的某一天，迎来属于它的延续。</p>
   </section></div>`;
 }
 
@@ -439,6 +484,10 @@ function navigate() {
   document.title = `${titles[nextView]} · 续作观测室`;
   document.querySelector('#current-section').textContent = titles[nextView];
   document.querySelectorAll('[data-view]').forEach(a => {if(a.dataset.view === nextView) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');});
+  const sidebarModelLink = document.querySelector('.sidebar-model a');
+  if (sidebarModelLink) {
+    sidebarModelLink.style.display = nextView === 'about' ? 'none' : '';
+  }
   document.querySelector('.site-sidebar').classList.remove('open');
   document.querySelector('#menu-toggle').setAttribute('aria-expanded','false');
   if (dialog.open) dialog.close();

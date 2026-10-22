@@ -15,7 +15,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from pipeline.common import duration_minutes, normalize_subject, normalize_book, write_json
 
-UA = 'AnimeSeason2Predictor/0.1 (open-source research; https://github.com/bangumi/Archive)'
+UA = 'anise2/0.1 (open-source research; https://github.com/bangumi/Archive)'
 
 
 def session():
