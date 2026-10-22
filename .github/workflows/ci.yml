@@ -1,16 +1,27 @@
-name: Check static site and model logic
+name: Check and deploy static site
 on:
   push:
     branches: [main, master]
   pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      site_ref:
+        type: string
+        default: main
 permissions:
   contents: read
+concurrency:
+  group: static-site-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.site_ref || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -20,14 +31,37 @@ jobs:
           node-version: '22'
           cache: npm
       - run: pip install -r requirements.txt
+      - name: Restore latest trained catalog for the website
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -m pipeline.history catalog-restore
       - run: npm ci
       - run: npm test
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+      - uses: actions/upload-pages-artifact@v4
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        with:
+          path: dist
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: browser-checks
           path: test-results/
           retention-days: 7
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Deploy static site
+        id: deployment
+        uses: actions/deploy-pages@v4

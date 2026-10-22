@@ -112,13 +112,42 @@ def evidence(action, cache, output):
         print(f'Restored {len(payload.get("lookups",{}))} lookup records.')
 
 
+def catalog(action, directory, output):
+    """Share the latest trained results with releases that only change the UI."""
+    name='site-catalog.json.gz'
+    meta=metadata()
+    available=meta and any(a['name']==name for a in meta['assets'])
+    if action=='catalog-restore' and not available:
+        print('No trained catalog release yet; using the repository catalog.')
+        return
+    if meta is None:
+        raise ValueError('Create the snapshot release before storing the trained catalog')
+    path=Path(directory)/name
+    path.parent.mkdir(parents=True,exist_ok=True)
+    if action=='catalog-restore':
+        gh('release','download',TAG,'--repo',os.environ['GITHUB_REPOSITORY'],
+           '--pattern',name,'--dir',str(path.parent),'--clobber')
+    payload=load_snapshot(output if action=='catalog-store' else path)
+    if payload.get('schema_version')!=1 or not payload.get('items') or not payload.get('model'):
+        raise ValueError('Invalid trained catalog; refusing to replace website data')
+    if action=='catalog-store':
+        with gzip.open(path,'wt',encoding='utf-8') as f:
+            json.dump(payload,f,ensure_ascii=False,separators=(',',':'),allow_nan=False)
+        gh('release','upload',TAG,str(path),'--repo',os.environ['GITHUB_REPOSITORY'],'--clobber')
+    else:
+        write_json(output,payload)
+    print(f'{action}: {len(payload["items"])} series, generated {payload.get("generated_at")}')
+
+
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
-    p.add_argument('action', choices=['store', 'restore', 'evidence-store', 'evidence-restore'])
+    p.add_argument('action', choices=['store', 'restore', 'evidence-store', 'evidence-restore', 'catalog-store', 'catalog-restore'])
     p.add_argument('--snapshot', default='.cache/latest.json')
     p.add_argument('--directory', default='.cache/history')
     p.add_argument('--cache', default='.cache/research')
     p.add_argument('--evidence', default='data/external/enrichment.json')
+    p.add_argument('--catalog', default='data/catalog.json')
     a = p.parse_args()
-    if a.action.startswith('evidence-'):evidence(a.action,a.cache,a.evidence)
+    if a.action.startswith('catalog-'):catalog(a.action,a.directory,a.catalog)
+    elif a.action.startswith('evidence-'):evidence(a.action,a.cache,a.evidence)
     else:store(a.snapshot, a.directory) if a.action == 'store' else restore(a.directory)

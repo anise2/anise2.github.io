@@ -66,25 +66,19 @@ jobs:
           path: |
             dist/
             artifacts/
+            data/catalog.json
             data/external/enrichment.json
           retention-days: 30
-      - uses: actions/upload-pages-artifact@v4
+      - name: Preserve trained catalog for subsequent website-only releases
         if: github.event_name == 'schedule' || inputs.publish == true || vars.ENABLE_PAGES == 'true'
-        with:
-          path: dist
+        run: python -m pipeline.history catalog-store
   deploy:
     if: github.event_name == 'schedule' || inputs.publish == true || vars.ENABLE_PAGES == 'true'
     needs: train
-    runs-on: ubuntu-latest
     permissions:
+      contents: read
       pages: write
       id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-      - name: Deploy static site
-        id: deployment
-        uses: actions/deploy-pages@v4
+    uses: ./.github/workflows/ci.yml
+    with:
+      site_ref: main

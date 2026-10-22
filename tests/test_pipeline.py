@@ -237,6 +237,37 @@ class NormalizeTests(unittest.TestCase):
 
 
 class CheckpointTests(unittest.TestCase):
+    def test_trained_catalog_survives_website_only_releases(self):
+        from pipeline.history import catalog
+        from pipeline.common import write_json,load_snapshot
+        payload={'schema_version':1,'generated_at':'2026-10-21T15:00:00+00:00',
+                 'model':{'features':21},'items':[{'id':1,'probability':.42}],
+                 'annual_backtest':{'years':[{'cutoff':'2024-12-31','predictions':[{'id':1}]}]}}
+        with tempfile.TemporaryDirectory() as directory:
+            output=Path(directory)/'catalog.json';cache=Path(directory)/'release'
+            write_json(output,payload)
+            with patch('pipeline.history.metadata',return_value={'assets':[{'name':'site-catalog.json.gz'}]}), patch('pipeline.history.gh'), patch.dict('os.environ',{'GITHUB_REPOSITORY':'example/test'}):
+                catalog('catalog-store',cache,output)
+                write_json(output,{'items':[{'id':1,'probability':.1}]})
+                catalog('catalog-restore',cache,output)
+            self.assertEqual(load_snapshot(output),payload)
+
+    def test_missing_or_invalid_catalog_release_does_not_replace_checked_out_data(self):
+        import gzip,json
+        from pipeline.history import catalog
+        from pipeline.common import write_json,load_snapshot
+        with tempfile.TemporaryDirectory() as directory:
+            output=Path(directory)/'catalog.json';original={'items':[{'id':1}]}
+            write_json(output,original)
+            with patch('pipeline.history.metadata',return_value=None):
+                catalog('catalog-restore',directory,output)
+            self.assertEqual(load_snapshot(output),original)
+            with gzip.open(Path(directory)/'site-catalog.json.gz','wt') as f:
+                json.dump({'schema_version':1,'items':[],'model':{}},f)
+            with patch('pipeline.history.metadata',return_value={'assets':[{'name':'site-catalog.json.gz'}]}), patch('pipeline.history.gh'), patch.dict('os.environ',{'GITHUB_REPOSITORY':'example/test'}):
+                with self.assertRaises(ValueError):catalog('catalog-restore',directory,output)
+            self.assertEqual(load_snapshot(output),original)
+
     def test_adaptation_queue_prioritizes_new_then_oldest_expired(self):
         from pipeline.common import write_json
         with tempfile.TemporaryDirectory() as directory:
